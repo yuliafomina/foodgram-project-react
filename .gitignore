@@ -130,3 +130,12 @@ dmypy.json
 
 # .idea
 .idea
+
+# Local History for Visual Studio Code
+.history/
+
+.mypy_cache
+.vscode/
+
+media/
+static/
