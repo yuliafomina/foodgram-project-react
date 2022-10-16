@@ -1,22 +1,24 @@
 import io
+import textwrap
 
+from api.filters import RecipeFilter
+from api.permissions import IsOwnerAdminOrReadOnly
 from django.db.models import Sum
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
+                            ShoppingCart, Tag)
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from rest_framework import filters, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
-
-from api.filters import RecipeFilter
-from api.permissions import IsOwnerAdminOrReadOnly
-from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
-                            ShoppingCart, Tag)
 from users.models import Follow, User
 
-from . import serializers
+from . import serializers, paginators
 
 
 class IngredientViewSet(ReadOnlyModelViewSet):
@@ -39,6 +41,7 @@ class RecipeViewSet(ModelViewSet):
     permission_classes = (IsOwnerAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = RecipeFilter
+    pagination_class = paginators.LimitPaginator
 
     def get_serializer_class(self):
         if self.request.method in permissions.SAFE_METHODS:
@@ -116,6 +119,7 @@ class RecipeViewSet(ModelViewSet):
     def download_shopping_cart(self, request):
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer)
+        pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
         shopping_cart = RecipeIngredient.objects.filter(
             recipe__carts__user=request.user
         ).values(
@@ -127,23 +131,33 @@ class RecipeViewSet(ModelViewSet):
             'ingredient_amount',
             'ingredient__measurement_unit'
         )
-        shopping_list = 'Список покупок:\n\t'
+        shopping_list = 'Список покупок: '
         for ingredient in shopping_cart:
             shopping_list += (
-                f'{ingredient[0]} {ingredient[1]} {ingredient[2]}, \n\t'
+                f'{ingredient[0]} {ingredient[1]} {ingredient[2]}, '
             )
-        p.drawString(100, 100, shopping_list)
+
+        lines = textwrap.wrap(shopping_list, width=65)
+        first_line = lines[0]
+        remainder = ' '.join(lines[1:])
+        lines = textwrap.wrap(remainder, 65)
+        lines = lines[:10]
+        p.setFont('Verdana', 14)
+        p.drawString(60, 700, first_line)
+        for n, l in enumerate(lines, 1):
+            p.drawString(60, 700 - (n*28), l)
         p.showPage()
         p.save()
         buffer.seek(0)
         return FileResponse(
-            buffer, as_attachment=True, filename='shopping_cart.pdf'
+            buffer, as_attachment=True, filename='shopping_cart.pdf',
         )
 
 
 class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
     serializer_class = serializers.UserSerializer
+    pagination_class = paginators.LimitPaginator
 
     @action(
         detail=False,
