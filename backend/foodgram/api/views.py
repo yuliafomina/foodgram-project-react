@@ -1,7 +1,7 @@
 import io
 import textwrap
 
-from api.filters import RecipeFilter
+from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsOwnerAdminOrReadOnly
 from django.db.models import Sum
 from django.http import FileResponse
@@ -12,7 +12,7 @@ from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
-from rest_framework import filters, permissions, status
+from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
@@ -24,9 +24,8 @@ from . import serializers, paginators
 class IngredientViewSet(ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
     serializer_class = serializers.IngredientSerializer
-    filter_backends = (filters.SearchFilter,)
-    search_fields = ('^name',)
-    pagination_class = None
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = IngredientFilter
 
 
 class TagViewSet(ReadOnlyModelViewSet):

@@ -1,6 +1,7 @@
 import base64
 
 from django.core.files.base import ContentFile
+from django.contrib.auth import password_validation
 from rest_framework import serializers, validators
 
 from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
@@ -37,6 +38,10 @@ class UserSerializer(serializers.ModelSerializer):
             'is_subscribed'
         )
         extra_kwargs = {'password': {'write_only': True}}
+
+    def validate_password(self, value):
+        password_validation.validate_password(value, self.instance)
+        return value
 
     def create(self, validated_data):
         user = User(
