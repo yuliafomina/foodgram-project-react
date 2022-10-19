@@ -8,7 +8,28 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SECRET_KEY = str(os.getenv('SECRET_KEY'))
 
-DEBUG = True
+DEBUG = False
+
+if DEBUG:
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'level': 'DEBUG',
+                'class': 'logging.StreamHandler',
+            },
+            'logfile': {
+                'level': 'DEBUG',
+                'class': 'logging.FileHandler',
+                'filename': os.path.join(BASE_DIR, 'logs/backend.log'),
+            },
+        },
+        'root': {
+            'level': 'INFO',
+            'handlers': ['console', 'logfile']
+        },
+    }
 
 ALLOWED_HOSTS = ['*']
 
@@ -112,3 +133,5 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 AUTH_USER_MODEL = 'users.User'
 
 EMPTY_VALUE_DISPLAY = '-пусто-'
+
+FONTS_ROOT = os.path.join(BASE_DIR, 'fonts/')

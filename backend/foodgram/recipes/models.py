@@ -98,7 +98,7 @@ class RecipeIngredient(models.Model):
         related_name='recipes'
     )
     amount = models.IntegerField(
-        validators=[MinValueValidator(0)],
+        validators=[MinValueValidator(1)],
         help_text='Количество ингредиентов должно быть больше единицы',
         verbose_name='Количество ингредиентов'
     )

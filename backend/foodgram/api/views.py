@@ -1,5 +1,7 @@
 import io
-import textwrap
+import os
+
+from django.conf import settings
 
 from api.filters import IngredientFilter, RecipeFilter
 from api.permissions import IsOwnerAdminOrReadOnly
@@ -9,9 +11,12 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from recipes.models import (Favorite, Ingredient, Recipe, RecipeIngredient,
                             ShoppingCart, Tag)
+from reportlab.lib.units import inch
+from reportlab.lib import pagesizes
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.rl_config import defaultPageSize
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
 from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -116,9 +121,24 @@ class RecipeViewSet(ModelViewSet):
         permission_classes=(permissions.IsAuthenticated,)
         )
     def download_shopping_cart(self, request):
-        buffer = io.BytesIO()
-        p = canvas.Canvas(buffer)
-        pdfmetrics.registerFont(TTFont('Verdana', 'Verdana.ttf'))
+        def firstPageContent(page_canvas, document):
+            header_content = 'Список покупок'
+            headerHeight = defaultPageSize[1] - 50
+            headerWidth = defaultPageSize[0]/2.0
+
+            page_canvas.saveState()
+            page_canvas.setFont('Verdana', 18)
+            page_canvas.drawCentredString(
+                headerWidth,
+                headerHeight,
+                header_content
+            )
+            page_canvas.restoreState()
+
+        pdfmetrics.registerFont(
+            TTFont('Verdana', os.path.join(settings.FONTS_ROOT, 'Verdana.ttf'))
+        )
+
         shopping_cart = RecipeIngredient.objects.filter(
             recipe__carts__user=request.user
         ).values(
@@ -130,23 +150,34 @@ class RecipeViewSet(ModelViewSet):
             'ingredient_amount',
             'ingredient__measurement_unit'
         )
-        shopping_list = 'Список покупок: '
-        for ingredient in shopping_cart:
-            shopping_list += (
-                f'{ingredient[0]} {ingredient[1]} {ingredient[2]}, '
-            )
 
-        lines = textwrap.wrap(shopping_list, width=65)
-        first_line = lines[0]
-        remainder = ' '.join(lines[1:])
-        lines = textwrap.wrap(remainder, 65)
-        lines = lines[:10]
-        p.setFont('Verdana', 14)
-        p.drawString(60, 700, first_line)
-        for n, l in enumerate(lines, 1):
-            p.drawString(60, 700 - (n*28), l)
-        p.showPage()
-        p.save()
+        document_content = [
+            (ingredient[0], ingredient[1], ingredient[2])
+            for ingredient in shopping_cart
+        ]
+
+        buffer = io.BytesIO()
+        document = SimpleDocTemplate(
+            buffer,
+            pagesize=pagesizes.portrait(pagesizes.A4),
+        )
+
+        columns_width = [6*inch, 1*inch, 1*inch]
+        table = Table(
+            document_content,
+            rowHeights=20,
+            repeatRows=1,
+            colWidths=columns_width,
+            hAlign='CENTER'
+        )
+
+        table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 18),
+            ('FONTNAME', (0, 0), (-1, -1), "Verdana"),
+        ]))
+
+        document.build([table], onFirstPage=firstPageContent)
+
         buffer.seek(0)
         return FileResponse(
             buffer, as_attachment=True, filename='shopping_cart.pdf',
